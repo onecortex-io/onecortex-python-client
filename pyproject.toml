@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Python client for the OneCortex platform"
 readme = "README.md"
 authors = [
-    { name = "Bharat Mehan", email = "" }
+    { name = "Bharat Mehan" }
 ]
 license = { file = "LICENSE" }
 requires-python = ">=3.11"

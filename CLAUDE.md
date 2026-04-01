@@ -36,3 +36,20 @@ All HTTP goes through `HttpClient.request()` — never use httpx directly in ser
 - **Tests**: Unit tests use `respx` to mock HTTP. Integration tests require `ONECORTEX_HOST` and `ONECORTEX_API_KEY` env vars
 - **Exceptions**: All inherit from `OnecortexError`. Error codes from server map to specific exception classes in `exceptions.py`
 - **Version**: Single source of truth is `version` in `pyproject.toml`
+
+---
+
+## Cross-Service Context
+
+This SDK implements the Python interface to `onecortex-vector` (fully implemented)
+and `onecortex-auth` (stub at `src/onecortex/auth/_client.py`).
+
+SDK parity rule: every public method in this client must have an equivalent in
+`onecortex-typescript-client` with the same logical name (mapped snake_case ↔ camelCase),
+same parameters, and identical error behaviour. Never add a method to one SDK
+without adding it to the other.
+
+When the backend API changes, use `/sync-clients <description>` from the org root
+to update both SDKs together.
+
+See `../CLAUDE.md` for the full parity rules, dependency graph, and slash commands.
