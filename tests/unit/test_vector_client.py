@@ -8,8 +8,8 @@ from onecortex.exceptions import NotFoundError
 BASE = "http://test-server:8080"
 VP = "/v1/vector"
 
-INDEX_RESPONSE = {
-    "name": "test-idx",
+COLLECTION_RESPONSE = {
+    "name": "test-col",
     "dimension": 3,
     "metric": "cosine",
     "status": {"ready": True, "state": "Ready"},
@@ -18,92 +18,94 @@ INDEX_RESPONSE = {
 
 
 @respx.mock
-def test_create_index():
-    respx.post(f"{BASE}{VP}/indexes").mock(return_value=httpx.Response(200, json=INDEX_RESPONSE))
+def test_create_collection():
+    respx.post(f"{BASE}{VP}/collections").mock(return_value=httpx.Response(200, json=COLLECTION_RESPONSE))
     pc = Onecortex(url=BASE, api_key="key123")
-    idx = pc.vector.create_index(name="test-idx", dimension=3, metric="cosine")
-    assert idx.name == "test-idx"
-    assert idx.dimension == 3
+    col = pc.vector.create_collection(name="test-col", dimension=3, metric="cosine")
+    assert col.name == "test-col"
+    assert col.dimension == 3
 
 
 @respx.mock
-def test_create_index_ignores_spec():
-    respx.post(f"{BASE}{VP}/indexes").mock(return_value=httpx.Response(200, json=INDEX_RESPONSE))
+def test_create_collection_ignores_spec():
+    respx.post(f"{BASE}{VP}/collections").mock(return_value=httpx.Response(200, json=COLLECTION_RESPONSE))
     pc = Onecortex(url=BASE, api_key="key123")
     # spec= is an unknown arg — must not raise
-    idx = pc.vector.create_index(
-        name="test-idx",
+    col = pc.vector.create_collection(
+        name="test-col",
         dimension=3,
         spec={"serverless": {"cloud": "aws", "region": "us-east-1"}},
     )
-    assert idx.name == "test-idx"
+    assert col.name == "test-col"
 
 
 @respx.mock
-def test_describe_index():
-    respx.get(f"{BASE}{VP}/indexes/test-idx").mock(return_value=httpx.Response(200, json=INDEX_RESPONSE))
+def test_describe_collection():
+    respx.get(f"{BASE}{VP}/collections/test-col").mock(return_value=httpx.Response(200, json=COLLECTION_RESPONSE))
     pc = Onecortex(url=BASE, api_key="key123")
-    idx = pc.vector.describe_index("test-idx")
-    assert idx.metric == "cosine"
+    col = pc.vector.describe_collection("test-col")
+    assert col.metric == "cosine"
 
 
 @respx.mock
-def test_list_indexes():
-    respx.get(f"{BASE}{VP}/indexes").mock(return_value=httpx.Response(200, json={"indexes": [INDEX_RESPONSE]}))
+def test_list_collections():
+    respx.get(f"{BASE}{VP}/collections").mock(
+        return_value=httpx.Response(200, json={"collections": [COLLECTION_RESPONSE]})
+    )
     pc = Onecortex(url=BASE, api_key="key123")
-    indexes = pc.vector.list_indexes()
-    assert len(indexes) == 1
-    assert indexes[0].name == "test-idx"
+    collections = pc.vector.list_collections()
+    assert len(collections) == 1
+    assert collections[0].name == "test-col"
 
 
 @respx.mock
-def test_delete_index():
-    respx.delete(f"{BASE}{VP}/indexes/test-idx").mock(return_value=httpx.Response(202))
+def test_delete_collection():
+    respx.delete(f"{BASE}{VP}/collections/test-col").mock(return_value=httpx.Response(202))
     pc = Onecortex(url=BASE, api_key="key123")
-    pc.vector.delete_index("test-idx")  # should not raise
+    pc.vector.delete_collection("test-col")  # should not raise
 
 
 @respx.mock
-def test_has_index_true():
-    respx.get(f"{BASE}{VP}/indexes/test-idx").mock(return_value=httpx.Response(200, json=INDEX_RESPONSE))
+def test_has_collection_true():
+    respx.get(f"{BASE}{VP}/collections/test-col").mock(return_value=httpx.Response(200, json=COLLECTION_RESPONSE))
     pc = Onecortex(url=BASE, api_key="key123")
-    assert pc.vector.has_index("test-idx") is True
+    assert pc.vector.has_collection("test-col") is True
 
 
 @respx.mock
-def test_has_index_false():
-    respx.get(f"{BASE}{VP}/indexes/missing").mock(
+def test_has_collection_false():
+    respx.get(f"{BASE}{VP}/collections/missing").mock(
         return_value=httpx.Response(404, json={"error": {"code": "NOT_FOUND", "message": "not found"}})
     )
     pc = Onecortex(url=BASE, api_key="key123")
-    assert pc.vector.has_index("missing") is False
+    assert pc.vector.has_collection("missing") is False
 
 
 @respx.mock
-def test_configure_index():
-    respx.patch(f"{BASE}{VP}/indexes/test-idx").mock(return_value=httpx.Response(200, json=INDEX_RESPONSE))
+def test_configure_collection():
+    respx.patch(f"{BASE}{VP}/collections/test-col").mock(return_value=httpx.Response(200, json=COLLECTION_RESPONSE))
     pc = Onecortex(url=BASE, api_key="key123")
-    result = pc.vector.configure_index("test-idx", tags={"env": "prod"})
-    assert result.name == "test-idx"
+    result = pc.vector.configure_collection("test-col", tags={"env": "prod"})
+    assert result.name == "test-col"
 
 
 @respx.mock
 def test_not_found_raises():
-    respx.get(f"{BASE}{VP}/indexes/missing").mock(
+    respx.get(f"{BASE}{VP}/collections/missing").mock(
         return_value=httpx.Response(404, json={"error": {"code": "NOT_FOUND", "message": "not found"}})
     )
     pc = Onecortex(url=BASE, api_key="key123")
     with pytest.raises(NotFoundError):
-        pc.vector.describe_index("missing")
+        pc.vector.describe_collection("missing")
 
 
 # ── Alias tests ──────────────────────────────────────────────────────────────
 
-ALIAS_RESPONSE = {"alias": "prod", "indexName": "my-index-v2"}
+ALIAS_RESPONSE = {"alias": "prod", "collectionName": "my-col-v2"}
 ALIAS_LIST_RESPONSE = {
     "aliases": [
-        {"alias": "prod", "indexName": "my-index-v2"},
-        {"alias": "staging", "indexName": "my-index-v1"},
+        {"alias": "prod", "collectionName": "my-col-v2"},
+        {"alias": "staging", "collectionName": "my-col-v1"},
     ]
 }
 
@@ -114,11 +116,11 @@ def test_create_alias():
 
     route = respx.post(f"{BASE}{VP}/aliases").mock(return_value=httpx.Response(201, json=ALIAS_RESPONSE))
     pc = Onecortex(url=BASE, api_key="key123")
-    result = pc.vector.create_alias(alias="prod", index_name="my-index-v2")
+    result = pc.vector.create_alias(alias="prod", collection_name="my-col-v2")
     assert result.alias == "prod"
-    assert result.index_name == "my-index-v2"
+    assert result.collection_name == "my-col-v2"
     body = json.loads(route.calls[0].request.content)
-    assert body == {"alias": "prod", "indexName": "my-index-v2"}
+    assert body == {"alias": "prod", "collectionName": "my-col-v2"}
 
 
 @respx.mock
@@ -128,7 +130,7 @@ def test_list_aliases():
     result = pc.vector.list_aliases()
     assert len(result.aliases) == 2
     assert result.aliases[0].alias == "prod"
-    assert result.aliases[1].index_name == "my-index-v1"
+    assert result.aliases[1].collection_name == "my-col-v1"
 
 
 @respx.mock
@@ -137,7 +139,7 @@ def test_describe_alias():
     pc = Onecortex(url=BASE, api_key="key123")
     result = pc.vector.describe_alias("prod")
     assert result.alias == "prod"
-    assert result.index_name == "my-index-v2"
+    assert result.collection_name == "my-col-v2"
 
 
 @respx.mock

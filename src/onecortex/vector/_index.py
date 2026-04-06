@@ -1,10 +1,10 @@
 from .._http import HttpClient
 from .models import (
     BatchQueryResult,
+    CollectionStats,
     FetchResult,
     GroupedMatch,
     GroupedQueryResult,
-    IndexStats,
     ListResult,
     QueryResult,
     RecommendResult,
@@ -13,13 +13,13 @@ from .models import (
 )
 
 
-class Index:
-    """Handles all data-plane operations for a specific index."""
+class Collection:
+    """Handles all data-plane operations for a specific collection."""
 
     def __init__(self, http: HttpClient, base_path: str, name: str):
         self._http = http
         self._name = name
-        self._base = f"{base_path}/indexes/{name}"
+        self._base = f"{base_path}/collections/{name}"
 
     def upsert(
         self,
@@ -27,12 +27,12 @@ class Index:
         namespace: str = "",
     ) -> UpsertResult:
         """
-        Upsert vectors into the index.
+        Upsert records into the collection.
         Each vector dict: {"id": str, "values": list[float], "metadata": dict (optional), "text": str (optional)}
         Note: "sparseValues" key is accepted and silently ignored by the server.
         """
         response = self._http.post(
-            f"{self._base}/vectors/upsert",
+            f"{self._base}/records/upsert",
             json={"vectors": vectors, "namespace": namespace},
         )
         return UpsertResult.model_validate(response.json())
@@ -44,7 +44,7 @@ class Index:
         batch_size: int = 200,
     ) -> int:
         """
-        Upsert a large list of vectors in batches.
+        Upsert a large list of records in batches.
         Returns total upserted count.
         """
         total = 0
@@ -59,9 +59,9 @@ class Index:
         ids: list[str],
         namespace: str = "",
     ) -> FetchResult:
-        """Fetch vectors by ID."""
+        """Fetch records by ID."""
         response = self._http.post(
-            f"{self._base}/vectors/fetch",
+            f"{self._base}/records/fetch",
             json={"ids": ids, "namespace": namespace},
         )
         return FetchResult.model_validate(response.json())
@@ -74,9 +74,9 @@ class Index:
         include_values: bool = False,
         include_metadata: bool = True,
     ) -> FetchResult:
-        """Fetch vectors matching a metadata filter (Onecortex extension)."""
+        """Fetch records matching a metadata filter (Onecortex extension)."""
         response = self._http.post(
-            f"{self._base}/vectors/fetch_by_metadata",
+            f"{self._base}/records/fetch_by_metadata",
             json={
                 "filter": filter,
                 "namespace": namespace,
@@ -94,7 +94,7 @@ class Index:
         delete_all: bool = False,
         namespace: str = "",
     ) -> None:
-        """Delete vectors by IDs, by metadata filter, or all in namespace."""
+        """Delete records by IDs, by metadata filter, or all in namespace."""
         body: dict = {"namespace": namespace}
         if delete_all:
             body["deleteAll"] = True
@@ -104,7 +104,7 @@ class Index:
             body["filter"] = filter
         else:
             raise ValueError("Provide ids, filter, or delete_all=True")
-        self._http.post(f"{self._base}/vectors/delete", json=body)
+        self._http.post(f"{self._base}/records/delete", json=body)
 
     def update(
         self,
@@ -114,7 +114,7 @@ class Index:
         text: str | None = None,
         namespace: str = "",
     ) -> None:
-        """Update values and/or metadata for a single vector. Metadata is merged, not replaced."""
+        """Update values and/or metadata for a single record. Metadata is merged, not replaced."""
         body: dict = {"id": id, "namespace": namespace}
         if values is not None:
             body["values"] = values
@@ -122,7 +122,7 @@ class Index:
             body["setMetadata"] = set_metadata
         if text is not None:
             body["text"] = text
-        self._http.post(f"{self._base}/vectors/update", json=body)
+        self._http.post(f"{self._base}/records/update", json=body)
 
     def query(
         self,
@@ -138,13 +138,13 @@ class Index:
         group_by: dict | None = None,
     ) -> QueryResult | GroupedQueryResult:
         """
-        Search for similar vectors using dense ANN.
+        Search for similar records using dense ANN.
 
         Args:
-            vector: Query vector (must match index dimension).
+            vector: Query vector (must match collection dimension).
             top_k: Number of results (max 10 000).
             filter: Metadata filter using the same DSL as fetch_by_metadata().
-            id: Query by vector ID instead of a raw vector.
+            id: Query by record ID instead of a raw vector.
             rerank: Optional reranking options dict with keys:
                 query (str, required): Natural-language reranker query.
                 topN (int, optional): Results after reranking. Defaults to top_k.
@@ -205,7 +205,7 @@ class Index:
         Hybrid ANN + BM25 query with Reciprocal Rank Fusion.
 
         Args:
-            vector: Dense query vector (must match index dimension).
+            vector: Dense query vector (must match collection dimension).
             text:   BM25 query text.
             top_k:  Number of results to return (max 10000).
             alpha:  Dense weight [0.0, 1.0]. 0.5 = equal blend.
@@ -244,7 +244,7 @@ class Index:
         include_metadata: bool = True,
     ) -> ScrollResult:
         """
-        Paginate over all vectors in the index using cursor-based iteration.
+        Paginate over all records in the collection using cursor-based iteration.
 
         Pass scroll_result.next_cursor into cursor= to advance to the next page.
         Returns ScrollResult with next_cursor=None on the last page.
@@ -259,7 +259,7 @@ class Index:
             body["filter"] = filter
         if cursor is not None:
             body["cursor"] = cursor
-        response = self._http.post(f"{self._base}/vectors/scroll", json=body)
+        response = self._http.post(f"{self._base}/records/scroll", json=body)
         return ScrollResult.model_validate(response.json())
 
     def sample(
@@ -271,7 +271,7 @@ class Index:
         include_metadata: bool = True,
     ) -> ScrollResult:
         """
-        Return a random sample of up to `size` vectors from the index.
+        Return a random sample of up to `size` records from the collection.
         Supports the same filter DSL as query().
         """
         body: dict = {
@@ -312,7 +312,7 @@ class Index:
         score_threshold: float | None = None,
     ) -> RecommendResult:
         """
-        Find similar vectors from positive example IDs, optionally steered away
+        Find similar records from positive example IDs, optionally steered away
         from negative example IDs. Input IDs are always excluded from results.
 
         Algorithm: mean(positives) - mean(negatives) used as the synthetic query vector.
@@ -339,16 +339,16 @@ class Index:
         limit: int = 100,
         pagination_token: str | None = None,
     ) -> ListResult:
-        """List vector IDs in a namespace, optionally filtered by prefix."""
+        """List record IDs in a namespace, optionally filtered by prefix."""
         params: dict = {"namespace": namespace, "limit": str(limit)}
         if prefix:
             params["prefix"] = prefix
         if pagination_token:
             params["paginationToken"] = pagination_token
-        response = self._http.get(f"{self._base}/vectors/list", params=params)
+        response = self._http.get(f"{self._base}/records/list", params=params)
         return ListResult.model_validate(response.json())
 
-    def describe_index_stats(self) -> IndexStats:
-        """Get vector counts per namespace."""
-        response = self._http.post(f"{self._base}/describe_index_stats", json={})
-        return IndexStats.model_validate(response.json())
+    def describe_collection_stats(self) -> CollectionStats:
+        """Get record counts per namespace."""
+        response = self._http.post(f"{self._base}/describe_collection_stats", json={})
+        return CollectionStats.model_validate(response.json())

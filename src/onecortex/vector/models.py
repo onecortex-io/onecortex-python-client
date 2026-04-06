@@ -3,18 +3,18 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class IndexStatus(BaseModel):
+class CollectionStatus(BaseModel):
     ready: bool
     state: str
 
 
-class IndexDescription(BaseModel):
+class CollectionDescription(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     name: str
     dimension: int
     metric: str
-    status: IndexStatus
+    status: CollectionStatus
     host: str
     spec: dict = Field(default_factory=dict)
     vector_type: str = "dense"
@@ -40,26 +40,26 @@ class UpsertResult(BaseModel):
 
 
 class FetchResult(BaseModel):
-    vectors: dict[str, Any]
+    records: dict[str, Any]
     namespace: str
 
 
 class ListResult(BaseModel):
-    vectors: list[dict]
+    records: list[dict]
     namespace: str
     pagination: dict | None = None
 
 
 class NamespaceSummary(BaseModel):
-    vector_count: int = Field(alias="vectorCount")
+    record_count: int = Field(alias="recordCount")
     model_config = ConfigDict(populate_by_name=True)
 
 
-class IndexStats(BaseModel):
+class CollectionStats(BaseModel):
     namespaces: dict[str, NamespaceSummary]
     dimension: int
-    index_fullness: float = Field(alias="indexFullness")
-    total_vector_count: int = Field(alias="totalVectorCount")
+    collection_fullness: float = Field(alias="collectionFullness")
+    total_record_count: int = Field(alias="totalRecordCount")
     model_config = ConfigDict(populate_by_name=True)
 
 
@@ -75,7 +75,7 @@ class ScrollVector(BaseModel):
 class ScrollResult(BaseModel):
     """Returned by scroll() and sample(). next_cursor is None on the last page."""
 
-    vectors: list[ScrollVector]
+    records: list[ScrollVector]
     namespace: str
     next_cursor: str | None = Field(None, alias="nextCursor")
     model_config = ConfigDict(populate_by_name=True)
@@ -120,7 +120,7 @@ class AliasDescription(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     alias: str
-    index_name: str = Field(alias="indexName")
+    collection_name: str = Field(alias="collectionName")
 
 
 class AliasListResult(BaseModel):

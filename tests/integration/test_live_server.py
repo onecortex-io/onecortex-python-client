@@ -10,7 +10,7 @@ import pytest
 from onecortex.exceptions import NotFoundError
 from onecortex.vector.models import GroupedQueryResult
 
-INDEX_NAME = "sdk-integration-test"
+COLLECTION_NAME = "sdk-integration-test"
 DIM = 3
 
 
@@ -18,36 +18,36 @@ DIM = 3
 def cleanup(oc_client):
     yield
     with contextlib.suppress(Exception):
-        oc_client.vector.delete_index(INDEX_NAME)
+        oc_client.vector.delete_collection(COLLECTION_NAME)
 
 
-def test_create_and_describe_index(oc_client):
-    idx = oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM, metric="cosine")
-    assert idx.name == INDEX_NAME
-    assert idx.dimension == DIM
+def test_create_and_describe_collection(oc_client):
+    col = oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM, metric="cosine")
+    assert col.name == COLLECTION_NAME
+    assert col.dimension == DIM
 
-    described = oc_client.vector.describe_index(INDEX_NAME)
-    assert described.name == INDEX_NAME
-
-
-def test_list_indexes(oc_client):
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    indexes = oc_client.vector.list_indexes()
-    names = [i.name for i in indexes]
-    assert INDEX_NAME in names
+    described = oc_client.vector.describe_collection(COLLECTION_NAME)
+    assert described.name == COLLECTION_NAME
 
 
-def test_has_index(oc_client):
-    assert oc_client.vector.has_index(INDEX_NAME) is False
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    assert oc_client.vector.has_index(INDEX_NAME) is True
+def test_list_collections(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    collections = oc_client.vector.list_collections()
+    names = [c.name for c in collections]
+    assert COLLECTION_NAME in names
+
+
+def test_has_collection(oc_client):
+    assert oc_client.vector.has_collection(COLLECTION_NAME) is False
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    assert oc_client.vector.has_collection(COLLECTION_NAME) is True
 
 
 def test_upsert_and_fetch(oc_client):
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
 
-    result = idx.upsert(
+    result = col.upsert(
         vectors=[
             {"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {"label": "a"}},
             {"id": "v2", "values": [0.0, 1.0, 0.0], "metadata": {"label": "b"}},
@@ -55,97 +55,97 @@ def test_upsert_and_fetch(oc_client):
     )
     assert result.upserted_count == 2
 
-    fetched = idx.fetch(ids=["v1"])
-    assert "v1" in fetched.vectors
+    fetched = col.fetch(ids=["v1"])
+    assert "v1" in fetched.records
 
 
 def test_query(oc_client):
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
         vectors=[
             {"id": "v1", "values": [1.0, 0.0, 0.0]},
             {"id": "v2", "values": [0.0, 1.0, 0.0]},
         ]
     )
 
-    results = idx.query(vector=[1.0, 0.0, 0.0], top_k=2, include_metadata=True)
+    results = col.query(vector=[1.0, 0.0, 0.0], top_k=2, include_metadata=True)
     assert len(results.matches) >= 1
     assert results.matches[0].id == "v1"
 
 
 def test_delete_by_ids(oc_client):
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
-    idx.delete(ids=["v1"])
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
+    col.delete(ids=["v1"])
 
-    fetched = idx.fetch(ids=["v1"])
-    assert "v1" not in fetched.vectors
+    fetched = col.fetch(ids=["v1"])
+    assert "v1" not in fetched.records
 
 
-def test_describe_index_stats(oc_client):
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
+def test_describe_collection_stats(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
 
-    stats = idx.describe_index_stats()
+    stats = col.describe_collection_stats()
     assert stats.dimension == DIM
-    assert stats.total_vector_count >= 1
+    assert stats.total_record_count >= 1
 
 
-def test_list_vectors(oc_client):
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
+def test_list_records(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
         vectors=[
             {"id": "doc-1", "values": [1.0, 0.0, 0.0]},
             {"id": "doc-2", "values": [0.0, 1.0, 0.0]},
         ]
     )
 
-    result = idx.list(prefix="doc-")
-    ids = [v["id"] for v in result.vectors]
+    result = col.list(prefix="doc-")
+    ids = [v["id"] for v in result.records]
     assert "doc-1" in ids
     assert "doc-2" in ids
 
 
 def test_update_metadata(oc_client):
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {"x": 1}}])
-    idx.update(id="v1", set_metadata={"x": 99})
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {"x": 1}}])
+    col.update(id="v1", set_metadata={"x": 99})
 
-    fetched = idx.fetch(ids=["v1"])
-    assert fetched.vectors["v1"]["metadata"]["x"] == 99
+    fetched = col.fetch(ids=["v1"])
+    assert fetched.records["v1"]["metadata"]["x"] == 99
 
 
 def test_not_found_error(oc_client):
     with pytest.raises(NotFoundError):
-        oc_client.vector.describe_index("nonexistent-index-xyz")
+        oc_client.vector.describe_collection("nonexistent-collection-xyz")
 
 
-HYBRID_INDEX = "sdk-hybrid-test"
+HYBRID_COLLECTION = "sdk-hybrid-test"
 
 
 @pytest.fixture()
 def hybrid_cleanup(oc_client):
     yield
     with contextlib.suppress(Exception):
-        oc_client.vector.delete_index(HYBRID_INDEX)
+        oc_client.vector.delete_collection(HYBRID_COLLECTION)
 
 
 def test_query_hybrid(oc_client, hybrid_cleanup):
-    oc_client.vector.create_index(name=HYBRID_INDEX, dimension=DIM, bm25_enabled=True)
-    idx = oc_client.vector.index(HYBRID_INDEX)
-    idx.upsert(
+    oc_client.vector.create_collection(name=HYBRID_COLLECTION, dimension=DIM, bm25_enabled=True)
+    col = oc_client.vector.collection(HYBRID_COLLECTION)
+    col.upsert(
         vectors=[
             {"id": "v1", "values": [1.0, 0.0, 0.0], "text": "machine learning basics"},
             {"id": "v2", "values": [0.0, 1.0, 0.0], "text": "cooking recipes"},
         ]
     )
 
-    results = idx.query_hybrid(
+    results = col.query_hybrid(
         vector=[1.0, 0.0, 0.0],
         text="machine learning",
         top_k=2,
@@ -155,9 +155,9 @@ def test_query_hybrid(oc_client, hybrid_cleanup):
 
 def test_query_with_rerank(oc_client, hybrid_cleanup):
     """Rerank with noop backend: request is accepted and results are returned."""
-    oc_client.vector.create_index(name=HYBRID_INDEX, dimension=DIM, bm25_enabled=True)
-    idx = oc_client.vector.index(HYBRID_INDEX)
-    idx.upsert(
+    oc_client.vector.create_collection(name=HYBRID_COLLECTION, dimension=DIM, bm25_enabled=True)
+    col = oc_client.vector.collection(HYBRID_COLLECTION)
+    col.upsert(
         vectors=[
             {
                 "id": "v1",
@@ -169,7 +169,7 @@ def test_query_with_rerank(oc_client, hybrid_cleanup):
         ]
     )
 
-    results = idx.query(
+    results = col.query(
         vector=[1.0, 0.0, 0.0],
         top_k=5,
         rerank={"query": "machine learning", "topN": 1, "rankField": "text"},
@@ -179,16 +179,16 @@ def test_query_with_rerank(oc_client, hybrid_cleanup):
 
 def test_query_hybrid_with_rerank(oc_client, hybrid_cleanup):
     """Hybrid query with reranking (noop backend)."""
-    oc_client.vector.create_index(name=HYBRID_INDEX, dimension=DIM, bm25_enabled=True)
-    idx = oc_client.vector.index(HYBRID_INDEX)
-    idx.upsert(
+    oc_client.vector.create_collection(name=HYBRID_COLLECTION, dimension=DIM, bm25_enabled=True)
+    col = oc_client.vector.collection(HYBRID_COLLECTION)
+    col.upsert(
         vectors=[
             {"id": "v1", "values": [1.0, 0.0, 0.0], "text": "machine learning basics"},
             {"id": "v2", "values": [0.0, 1.0, 0.0], "text": "cooking recipes"},
         ]
     )
 
-    results = idx.query_hybrid(
+    results = col.query_hybrid(
         vector=[1.0, 0.0, 0.0],
         text="machine learning",
         top_k=5,
@@ -201,21 +201,21 @@ def test_query_hybrid_with_rerank(oc_client, hybrid_cleanup):
 
 
 def test_scroll_and_pagination(oc_client):
-    """Scroll page-by-page and confirm all vectors are reachable."""
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
+    """Scroll page-by-page and confirm all records are reachable."""
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
         vectors=[
             {"id": f"v{i}", "values": [float(i % 2), float((i + 1) % 2), 0.0]}
-            for i in range(1, 6)  # 5 vectors
+            for i in range(1, 6)  # 5 records
         ]
     )
 
     all_ids: list[str] = []
     cursor = None
     while True:
-        page = idx.scroll(limit=2, cursor=cursor, include_values=False)
-        all_ids.extend(v.id for v in page.vectors)
+        page = col.scroll(limit=2, cursor=cursor, include_values=False)
+        all_ids.extend(v.id for v in page.records)
         if page.next_cursor is None:
             break
         cursor = page.next_cursor
@@ -225,25 +225,25 @@ def test_scroll_and_pagination(oc_client):
 
 
 def test_sample(oc_client):
-    """sample() returns at most `size` vectors with valid IDs."""
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
-        vectors=[{"id": f"v{i}", "values": [1.0, 0.0, 0.0]} for i in range(1, 11)]  # 10 vectors
+    """sample() returns at most `size` records with valid IDs."""
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
+        vectors=[{"id": f"v{i}", "values": [1.0, 0.0, 0.0]} for i in range(1, 11)]  # 10 records
     )
 
-    result = idx.sample(size=3)
-    assert 1 <= len(result.vectors) <= 3
-    for v in result.vectors:
+    result = col.sample(size=3)
+    assert 1 <= len(result.records) <= 3
+    for v in result.records:
         assert v.id.startswith("v")
     assert result.next_cursor is None
 
 
 def test_query_batch(oc_client):
     """query_batch returns results in the same order as the input queries."""
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
         vectors=[
             {"id": "v1", "values": [1.0, 0.0, 0.0]},
             {"id": "v2", "values": [0.0, 1.0, 0.0]},
@@ -251,7 +251,7 @@ def test_query_batch(oc_client):
         ]
     )
 
-    result = idx.query_batch(
+    result = col.query_batch(
         queries=[
             {"vector": [1.0, 0.0, 0.0], "topK": 1},
             {"vector": [0.0, 1.0, 0.0], "topK": 1},
@@ -263,17 +263,17 @@ def test_query_batch(oc_client):
 
 
 def test_query_score_threshold(oc_client):
-    """score_threshold filters out vectors below the minimum similarity."""
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
+    """score_threshold filters out records below the minimum similarity."""
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
         vectors=[
             {"id": "v1", "values": [1.0, 0.0, 0.0]},  # identical to query → score ~1.0
             {"id": "v2", "values": [0.0, 1.0, 0.0]},  # orthogonal → score ~0.0
         ]
     )
 
-    results = idx.query(vector=[1.0, 0.0, 0.0], top_k=10, score_threshold=0.9)
+    results = col.query(vector=[1.0, 0.0, 0.0], top_k=10, score_threshold=0.9)
     ids = [m.id for m in results.matches]
     assert "v1" in ids
     assert "v2" not in ids
@@ -281,9 +281,9 @@ def test_query_score_threshold(oc_client):
 
 def test_query_group_by(oc_client):
     """group_by returns a GroupedQueryResult grouped by the metadata field."""
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
         vectors=[
             {"id": "n1", "values": [0.9, 0.1, 0.0], "metadata": {"source": "news"}},
             {"id": "n2", "values": [0.8, 0.2, 0.0], "metadata": {"source": "news"}},
@@ -291,7 +291,7 @@ def test_query_group_by(oc_client):
         ]
     )
 
-    result = idx.query(
+    result = col.query(
         vector=[1.0, 0.0, 0.0],
         top_k=10,
         group_by={"field": "source", "limit": 5, "groupSize": 2},
@@ -305,10 +305,10 @@ def test_query_group_by(oc_client):
 
 
 def test_recommend(oc_client):
-    """recommend() excludes input IDs and returns semantically similar vectors."""
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(
+    """recommend() excludes input IDs and returns semantically similar records."""
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
         vectors=[
             {"id": "v1", "values": [1.0, 0.0, 0.0]},
             {"id": "v2", "values": [0.9, 0.1, 0.0]},
@@ -317,7 +317,7 @@ def test_recommend(oc_client):
         ]
     )
 
-    result = idx.recommend(positive_ids=["v1"], top_k=3)
+    result = col.recommend(positive_ids=["v1"], top_k=3)
     ids = [m.id for m in result.matches]
     assert "v1" not in ids          # input ID excluded
     assert ids[0] == "v2"           # most similar to v1
@@ -325,9 +325,9 @@ def test_recommend(oc_client):
 
 def test_alias_lifecycle(oc_client):
     """Full alias lifecycle: create → query → update target → delete."""
-    oc_client.vector.create_index(name=INDEX_NAME, dimension=DIM)
-    idx = oc_client.vector.index(INDEX_NAME)
-    idx.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM)
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
 
     alias_name = "sdk-test-alias"
     with contextlib.suppress(Exception):
@@ -335,13 +335,13 @@ def test_alias_lifecycle(oc_client):
 
     try:
         # Create alias
-        desc = oc_client.vector.create_alias(alias=alias_name, index_name=INDEX_NAME)
+        desc = oc_client.vector.create_alias(alias=alias_name, collection_name=COLLECTION_NAME)
         assert desc.alias == alias_name
-        assert desc.index_name == INDEX_NAME
+        assert desc.collection_name == COLLECTION_NAME
 
         # Query via alias — should resolve transparently
-        alias_idx = oc_client.vector.index(alias_name)
-        results = alias_idx.query(vector=[1.0, 0.0, 0.0], top_k=1)
+        alias_col = oc_client.vector.collection(alias_name)
+        results = alias_col.query(vector=[1.0, 0.0, 0.0], top_k=1)
         assert results.matches[0].id == "v1"
 
         # Confirm it appears in list_aliases()
@@ -351,7 +351,7 @@ def test_alias_lifecycle(oc_client):
 
         # describe_alias()
         described = oc_client.vector.describe_alias(alias_name)
-        assert described.index_name == INDEX_NAME
+        assert described.collection_name == COLLECTION_NAME
 
     finally:
         # Always clean up alias
