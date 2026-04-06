@@ -20,15 +20,15 @@ from onecortex import Onecortex
 client = Onecortex(url="https://your-project.onecortex.io", api_key="your-api-key")
 
 # Vector database
-client.vector.create_index(name="my-index", dimension=1536, metric="cosine")
-idx = client.vector.index("my-index")
+client.vector.create_collection(name="my-collection", dimension=1536, metric="cosine")
+col = client.vector.collection("my-collection")
 
-idx.upsert(vectors=[
+col.upsert(vectors=[
     {"id": "vec-1", "values": [0.1, 0.2, 0.3, ...], "metadata": {"genre": "sci-fi"}},
     {"id": "vec-2", "values": [0.4, 0.5, 0.6, ...], "metadata": {"genre": "fantasy"}},
 ])
 
-results = idx.query(vector=[0.1, 0.2, 0.3, ...], top_k=5, include_metadata=True)
+results = col.query(vector=[0.1, 0.2, 0.3, ...], top_k=5, include_metadata=True)
 for match in results.matches:
     print(f"{match.id}: score={match.score}")
 
@@ -72,9 +72,9 @@ from onecortex import (
 )
 
 try:
-    client.vector.describe_index("nonexistent")
+    client.vector.describe_collection("nonexistent")
 except NotFoundError as e:
-    print(f"Index not found: {e} (status={e.status_code})")
+    print(f"Collection not found: {e} (status={e.status_code})")
 except OnecortexError as e:
     print(f"Error: {e}")
 ```
