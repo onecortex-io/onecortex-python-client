@@ -1,6 +1,6 @@
 [project]
 name = "onecortex"
-version = "1.0.0"
+version = "1.1.0"
 description = "Python client for the OneCortex platform"
 readme = "README.md"
 authors = [

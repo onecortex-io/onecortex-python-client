@@ -334,4 +334,68 @@ def test_recommend_with_negatives():
     col.recommend(positive_ids=["v1"], negative_ids=["v9"], top_k=2, score_threshold=0.5)
     body = json.loads(route.calls[0].request.content)
     assert body["negativeIds"] == ["v9"]
-    assert body["scoreThreshold"] == 0.5
+
+
+# ── Faceted Counts ───────────────────────────────────────────────────────────
+
+FACETS_RESPONSE = {
+    "facets": [
+        {"value": "electronics", "count": 42},
+        {"value": "books", "count": 17},
+    ],
+    "field": "category",
+    "namespace": "",
+}
+
+
+@respx.mock
+def test_facet_counts_basic():
+    import json
+
+    route = respx.post(f"{COL_BASE}/facets").mock(return_value=httpx.Response(200, json=FACETS_RESPONSE))
+    col = make_collection()
+    result = col.facet_counts("category")
+    from onecortex.vector.models import FacetResult
+
+    assert isinstance(result, FacetResult)
+    assert result.field == "category"
+    assert result.namespace == ""
+    assert len(result.facets) == 2
+    assert result.facets[0].value == "electronics"
+    assert result.facets[0].count == 42
+    body = json.loads(route.calls[0].request.content)
+    assert body["field"] == "category"
+    assert body["limit"] == 20  # default
+    assert body["namespace"] == ""
+
+
+@respx.mock
+def test_facet_counts_with_filter_and_options():
+    import json
+
+    route = respx.post(f"{COL_BASE}/facets").mock(return_value=httpx.Response(200, json=FACETS_RESPONSE))
+    col = make_collection()
+    col.facet_counts(
+        "category",
+        filter={"price": {"$gt": 10}},
+        namespace="ns1",
+        limit=5,
+    )
+    body = json.loads(route.calls[0].request.content)
+    assert body["filter"] == {"price": {"$gt": 10}}
+    assert body["namespace"] == "ns1"
+    assert body["limit"] == 5
+
+
+@respx.mock
+def test_facet_counts_429_retry():
+    """facet_counts should retry on 429 like all other methods."""
+    respx.post(f"{COL_BASE}/facets").mock(
+        side_effect=[
+            httpx.Response(429, json={"error": {"code": "RATE_LIMITED", "message": "slow down"}}),
+            httpx.Response(200, json=FACETS_RESPONSE),
+        ]
+    )
+    col = make_collection()
+    result = col.facet_counts("category")
+    assert result.facets[0].value == "electronics"

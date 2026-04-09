@@ -113,6 +113,22 @@ class RecommendResult(BaseModel):
     namespace: str
 
 
+# ── Faceted Counts ───────────────────────────────────────────────────────────
+
+
+class FacetEntry(BaseModel):
+    value: str
+    count: int
+
+
+class FacetResult(BaseModel):
+    """Returned by facet_counts(). Each entry is a distinct metadata value with its record count."""
+
+    facets: list[FacetEntry]
+    field: str
+    namespace: str
+
+
 # ── Aliases ──────────────────────────────────────────────────────────────────
 
 

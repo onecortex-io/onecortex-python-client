@@ -319,8 +319,8 @@ def test_recommend(oc_client):
 
     result = col.recommend(positive_ids=["v1"], top_k=3)
     ids = [m.id for m in result.matches]
-    assert "v1" not in ids          # input ID excluded
-    assert ids[0] == "v2"           # most similar to v1
+    assert "v1" not in ids  # input ID excluded
+    assert ids[0] == "v2"  # most similar to v1
 
 
 def test_alias_lifecycle(oc_client):

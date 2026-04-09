@@ -2,6 +2,7 @@ from .._http import HttpClient
 from .models import (
     BatchQueryResult,
     CollectionStats,
+    FacetResult,
     FetchResult,
     GroupedMatch,
     GroupedQueryResult,
@@ -347,6 +348,31 @@ class Collection:
             params["paginationToken"] = pagination_token
         response = self._http.get(f"{self._base}/records/list", params=params)
         return ListResult.model_validate(response.json())
+
+    def facet_counts(
+        self,
+        field: str,
+        filter: dict | None = None,
+        namespace: str = "",
+        limit: int = 20,
+    ) -> FacetResult:
+        """
+        Return aggregated counts of distinct metadata values for a field.
+
+        Results are ordered by count descending. Records missing the requested
+        field are excluded. Supports the same filter DSL as query().
+
+        Args:
+            field: Metadata field to facet on (letters, digits, underscores, dots).
+            filter: Optional metadata filter to restrict which records are counted.
+            namespace: Namespace to scope the operation to.
+            limit: Maximum number of facet entries returned (1-100, default 20).
+        """
+        body: dict = {"field": field, "namespace": namespace, "limit": limit}
+        if filter is not None:
+            body["filter"] = filter
+        response = self._http.post(f"{self._base}/facets", json=body)
+        return FacetResult.model_validate(response.json())
 
     def describe_collection_stats(self) -> CollectionStats:
         """Get record counts per namespace."""
