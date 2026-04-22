@@ -17,7 +17,9 @@ class CollectionDescription(BaseModel):
     status: CollectionStatus
     host: str
     spec: dict = Field(default_factory=dict)
-    vector_type: str = "dense"
+    vector_type: str = Field(alias="vectorType", default="dense")
+    bm25_enabled: bool = Field(alias="bm25Enabled", default=False)
+    deletion_protected: bool | None = Field(alias="deletionProtected", default=None)
     tags: dict | None = None
 
 
@@ -31,7 +33,6 @@ class Match(BaseModel):
 class QueryResult(BaseModel):
     matches: list[Match]
     namespace: str
-    results: list = Field(default_factory=list)  # deprecated legacy field
 
 
 class UpsertResult(BaseModel):
@@ -40,8 +41,11 @@ class UpsertResult(BaseModel):
 
 
 class FetchResult(BaseModel):
-    records: dict[str, Any]
+    model_config = ConfigDict(populate_by_name=True)
+
+    records: list[dict]
     namespace: str
+    next_cursor: str | None = Field(alias="nextCursor", default=None)
 
 
 class ListResult(BaseModel):
@@ -94,7 +98,7 @@ class BatchQueryResult(BaseModel):
 
 
 class GroupedMatch(BaseModel):
-    group: str
+    key: str
     matches: list[Match]
 
 
@@ -103,6 +107,7 @@ class GroupedQueryResult(BaseModel):
 
     groups: list[GroupedMatch]
     namespace: str
+    grouped: bool = True
 
 
 # ── Recommendations ──────────────────────────────────────────────────────────

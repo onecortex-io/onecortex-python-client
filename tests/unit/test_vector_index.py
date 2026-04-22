@@ -5,23 +5,21 @@ import respx
 from onecortex import Onecortex
 
 BASE = "http://test-server:8080"
-VP = "/v1/vector"
+VP = "/v1"
 COL_NAME = "test-col"
 COL_BASE = f"{BASE}{VP}/collections/{COL_NAME}"
 
 QUERY_RESPONSE = {
     "matches": [{"id": "v1", "score": 0.99}],
     "namespace": "",
-    "results": [],
 }
 
 UPSERT_RESPONSE = {"upsertedCount": 2}
 
 FETCH_RESPONSE = {
-    "records": {
-        "v1": {"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {}},
-    },
+    "records": [{"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {}}],
     "namespace": "",
+    "nextCursor": None,
 }
 
 LIST_RESPONSE = {
@@ -89,7 +87,7 @@ def test_fetch():
     respx.post(f"{COL_BASE}/records/fetch").mock(return_value=httpx.Response(200, json=FETCH_RESPONSE))
     col = make_collection()
     result = col.fetch(ids=["v1"])
-    assert "v1" in result.records
+    assert result.records[0]["id"] == "v1"
 
 
 @respx.mock
@@ -204,11 +202,12 @@ BATCH_RESPONSE = {
 }
 
 GROUP_RESPONSE = {
-    "matches": [
-        {"group": "doc-1", "matches": [{"id": "c1", "score": 0.9}, {"id": "c2", "score": 0.8}]},
-        {"group": "doc-2", "matches": [{"id": "c3", "score": 0.7}]},
-    ],
     "namespace": "",
+    "grouped": True,
+    "groups": [
+        {"key": "doc-1", "matches": [{"id": "c1", "score": 0.9}, {"id": "c2", "score": 0.8}]},
+        {"key": "doc-2", "matches": [{"id": "c3", "score": 0.7}]},
+    ],
 }
 
 RECOMMEND_RESPONSE = {
@@ -301,7 +300,7 @@ def test_query_with_group_by():
 
     assert isinstance(result, GroupedQueryResult)
     assert len(result.groups) == 2
-    assert result.groups[0].group == "doc-1"
+    assert result.groups[0].key == "doc-1"
     assert result.groups[0].matches[0].id == "c1"
     body = json.loads(route.calls[0].request.content)
     assert body["groupBy"] == group_by

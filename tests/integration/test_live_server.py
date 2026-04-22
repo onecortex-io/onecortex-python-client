@@ -56,7 +56,7 @@ def test_upsert_and_fetch(oc_client):
     assert result.upserted_count == 2
 
     fetched = col.fetch(ids=["v1"])
-    assert "v1" in fetched.records
+    assert fetched.records[0]["id"] == "v1"
 
 
 def test_query(oc_client):
@@ -81,7 +81,7 @@ def test_delete_by_ids(oc_client):
     col.delete(ids=["v1"])
 
     fetched = col.fetch(ids=["v1"])
-    assert "v1" not in fetched.records
+    assert len(fetched.records) == 0
 
 
 def test_describe_collection_stats(oc_client):
@@ -117,7 +117,7 @@ def test_update_metadata(oc_client):
     col.update(id="v1", set_metadata={"x": 99})
 
     fetched = col.fetch(ids=["v1"])
-    assert fetched.records["v1"]["metadata"]["x"] == 99
+    assert fetched.records[0]["metadata"]["x"] == 99
 
 
 def test_not_found_error(oc_client):
@@ -297,7 +297,7 @@ def test_query_group_by(oc_client):
         group_by={"field": "source", "limit": 5, "groupSize": 2},
     )
     assert isinstance(result, GroupedQueryResult)
-    group_names = {g.group for g in result.groups}
+    group_names = {g.key for g in result.groups}
     assert "news" in group_names
     assert "sports" in group_names
     for g in result.groups:

@@ -51,7 +51,6 @@ def test_query_result():
     assert len(result.matches) == 2
     assert result.matches[0].id == "v1"
     assert result.matches[1].metadata == {"key": "val"}
-    assert result.results == []
 
 
 def test_collection_stats_aliases():
@@ -69,11 +68,13 @@ def test_collection_stats_aliases():
 
 def test_fetch_result():
     data = {
-        "records": {"v1": {"id": "v1", "values": [0.1, 0.2], "metadata": {}}},
+        "records": [{"id": "v1", "values": [0.1, 0.2], "metadata": {}}],
         "namespace": "",
+        "nextCursor": None,
     }
     result = FetchResult.model_validate(data)
-    assert "v1" in result.records
+    assert result.records[0]["id"] == "v1"
+    assert result.next_cursor is None
 
 
 def test_list_result_no_pagination():
@@ -159,10 +160,10 @@ def test_grouped_query_result():
     from onecortex.vector.models import GroupedMatch, Match
 
     groups = [
-        GroupedMatch(group="news-1", matches=[Match(id="n1", score=0.9)]),
-        GroupedMatch(group="sports-1", matches=[Match(id="s1", score=0.7)]),
+        GroupedMatch(key="news-1", matches=[Match(id="n1", score=0.9)]),
+        GroupedMatch(key="sports-1", matches=[Match(id="s1", score=0.7)]),
     ]
     result = GroupedQueryResult(groups=groups, namespace="")
     assert len(result.groups) == 2
-    assert result.groups[0].group == "news-1"
+    assert result.groups[0].key == "news-1"
     assert result.groups[0].matches[0].id == "n1"

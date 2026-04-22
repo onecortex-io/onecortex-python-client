@@ -6,7 +6,7 @@ from onecortex import Onecortex
 from onecortex.exceptions import NotFoundError
 
 BASE = "http://test-server:8080"
-VP = "/v1/vector"
+VP = "/v1"
 
 COLLECTION_RESPONSE = {
     "name": "test-col",
@@ -14,6 +14,9 @@ COLLECTION_RESPONSE = {
     "metric": "cosine",
     "status": {"ready": True, "state": "Ready"},
     "host": "test-server:8080",
+    "vectorType": "dense",
+    "bm25Enabled": False,
+    "deletionProtected": None,
 }
 
 

@@ -34,7 +34,7 @@ class Collection:
         """
         response = self._http.post(
             f"{self._base}/records/upsert",
-            json={"vectors": vectors, "namespace": namespace},
+            json={"records": vectors, "namespace": namespace},
         )
         return UpsertResult.model_validate(response.json())
 
@@ -82,8 +82,8 @@ class Collection:
                 "filter": filter,
                 "namespace": namespace,
                 "limit": limit,
-                "include_values": include_values,
-                "include_metadata": include_metadata,
+                "includeValues": include_values,
+                "includeMetadata": include_metadata,
             },
         )
         return FetchResult.model_validate(response.json())
@@ -182,7 +182,7 @@ class Collection:
         data = response.json()
 
         if group_by is not None:
-            raw_groups = data.get("matches", [])
+            raw_groups = data.get("groups", [])
             return GroupedQueryResult(
                 groups=[GroupedMatch(**g) for g in raw_groups],
                 namespace=data.get("namespace", ""),
