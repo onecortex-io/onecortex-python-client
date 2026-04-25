@@ -5,7 +5,7 @@ import respx
 from onecortex import Onecortex
 
 BASE = "http://test-server:8080"
-VP = "/v1"
+VP = "/vector/v1"
 COL_NAME = "test-col"
 COL_BASE = f"{BASE}{VP}/collections/{COL_NAME}"
 
@@ -36,7 +36,7 @@ STATS_RESPONSE = {
 
 
 def make_collection():
-    pc = Onecortex(url=BASE, api_key="key123")
+    pc = Onecortex(url=BASE)
     return pc.vector.collection(COL_NAME)
 
 

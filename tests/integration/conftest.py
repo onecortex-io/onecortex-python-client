@@ -4,10 +4,17 @@ import pytest
 
 from onecortex import Onecortex
 
-HOST = os.environ.get("ONECORTEX_HOST", "http://localhost:8080")
-API_KEY = os.environ.get("ONECORTEX_API_KEY", "")
+HOST = os.environ.get("ONECORTEX_URL", "http://localhost")
+ACCESS_TOKEN = os.environ.get("ONECORTEX_ACCESS_TOKEN", "")
+EMAIL = os.environ.get("ONECORTEX_EMAIL", "")
+PASSWORD = os.environ.get("ONECORTEX_PASSWORD", "")
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def oc_client():
-    return Onecortex(url=HOST, api_key=API_KEY)
+    client = Onecortex(url=HOST)
+    if ACCESS_TOKEN:
+        client.auth.set_session(access_token=ACCESS_TOKEN)
+    elif EMAIL and PASSWORD:
+        client.auth.login(email=EMAIL, password=PASSWORD)
+    return client

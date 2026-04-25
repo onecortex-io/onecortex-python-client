@@ -11,7 +11,7 @@ class VectorClient:
     Access via client.vector (e.g., client.vector.create_collection(...)).
     """
 
-    def __init__(self, http: HttpClient, base_path: str = "/v1"):
+    def __init__(self, http: HttpClient, base_path: str = "/vector/v1"):
         self._http = http
         self._base_path = base_path
 

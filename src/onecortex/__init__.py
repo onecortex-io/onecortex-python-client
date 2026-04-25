@@ -1,5 +1,5 @@
 from ._client import Onecortex
-from .auth import AuthClient
+from .auth import AuthClient, AuthSession, AuthUser
 from .exceptions import (
     AlreadyExistsError,
     InvalidArgumentError,
@@ -38,6 +38,8 @@ __all__ = [
     "AliasListResult",
     "AlreadyExistsError",
     "AuthClient",
+    "AuthSession",
+    "AuthUser",
     "BatchQueryResult",
     "Collection",
     "CollectionDescription",
