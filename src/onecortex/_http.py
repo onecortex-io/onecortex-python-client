@@ -5,10 +5,24 @@ import httpx
 
 from .exceptions import (
     AlreadyExistsError,
+    CollectionAlreadyExistsError,
+    CollectionNotFoundError,
+    DimensionMismatchError,
+    FacetFieldInvalidError,
+    FilterMalformedError,
+    FilterUnsupportedOperatorError,
+    GroupByFieldMissingError,
+    HybridRequiresBm25Error,
+    IndexNotReadyError,
     InvalidArgumentError,
     NotFoundError,
     OnecortexServerError,
     PermissionDeniedError,
+    RerankerConfigError,
+    RerankerRateLimitedError,
+    RerankerTimeoutError,
+    RerankerUpstreamError,
+    SparseNotSupportedError,
     UnauthorizedError,
 )
 
@@ -18,31 +32,78 @@ _ERROR_MAP = {
     "INVALID_ARGUMENT": InvalidArgumentError,
     "UNAUTHENTICATED": UnauthorizedError,
     "PERMISSION_DENIED": PermissionDeniedError,
+    # v0.2.0 stable codes
+    "DIMENSION_MISMATCH": DimensionMismatchError,
+    "SPARSE_NOT_SUPPORTED": SparseNotSupportedError,
+    "FILTER_MALFORMED": FilterMalformedError,
+    "FILTER_UNSUPPORTED_OPERATOR": FilterUnsupportedOperatorError,
+    "HYBRID_REQUIRES_BM25": HybridRequiresBm25Error,
+    "GROUPBY_FIELD_MISSING": GroupByFieldMissingError,
+    "FACET_FIELD_INVALID": FacetFieldInvalidError,
+    "INDEX_NOT_READY": IndexNotReadyError,
+    "COLLECTION_NOT_FOUND": CollectionNotFoundError,
+    "COLLECTION_ALREADY_EXISTS": CollectionAlreadyExistsError,
+    "RERANKER_RATE_LIMITED": RerankerRateLimitedError,
+    "RERANKER_TIMEOUT": RerankerTimeoutError,
+    "RERANKER_CONFIG": RerankerConfigError,
+    "RERANKER_UPSTREAM": RerankerUpstreamError,
 }
+
+# HTTP statuses that should trigger a retry on a transient failure.
+# 429: rate limited (incl. RERANKER_RATE_LIMITED).
+# 500: generic INTERNAL.
+# 504: RERANKER_TIMEOUT — retryable with caution.
+# 502 (RERANKER_UPSTREAM) and 503 (RERANKER_CONFIG) are *not* retried.
+_RETRYABLE_STATUSES = frozenset({429, 500, 504})
+
+
+def _parse_error(response: httpx.Response) -> tuple[str, str, dict[str, Any], str | None]:
+    """Return (code, message, details, request_id) parsed from an error response."""
+    code = "UNKNOWN"
+    message = response.text
+    details: dict[str, Any] = {}
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            # Vector-style: { "error": { "code": "...", "message": "...", "details": {...} } }
+            err = body.get("error")
+            if isinstance(err, dict):
+                code = err.get("code", "UNKNOWN")
+                message = err.get("message", response.text)
+                raw_details = err.get("details")
+                if isinstance(raw_details, dict):
+                    details = raw_details
+            elif "code" in body:
+                # Auth-style: { "code": "...", "msg": "..." }
+                code = str(body["code"]).upper().replace("-", "_")
+                message = str(body.get("msg", body.get("message", response.text)))
+    except Exception:
+        pass
+
+    request_id: str | None = None
+    raw_rid = details.get("requestId")
+    if isinstance(raw_rid, str) and raw_rid:
+        request_id = raw_rid
+    else:
+        header_rid = response.headers.get("x-request-id")
+        if header_rid:
+            request_id = header_rid
+
+    return code, message, details, request_id
 
 
 def _raise_for_response(response: httpx.Response) -> None:
     if response.status_code < 400:
         return
-    try:
-        body = response.json()
-        # Vector-style: { "error": { "code": "...", "message": "..." } }
-        if "error" in body and isinstance(body["error"], dict):
-            code = body["error"].get("code", "UNKNOWN")
-            message = body["error"].get("message", response.text)
-        # Auth-style: { "code": "...", "msg": "..." }
-        elif "code" in body:
-            code = str(body["code"]).upper().replace("-", "_")
-            message = body.get("msg", body.get("message", response.text))
-        else:
-            code = "UNKNOWN"
-            message = response.text
-    except Exception:
-        code = "UNKNOWN"
-        message = response.text
-
+    code, message, details, request_id = _parse_error(response)
     exc_class = _ERROR_MAP.get(code, OnecortexServerError)
-    raise exc_class(message, status_code=response.status_code)
+    raise exc_class(
+        message,
+        status_code=response.status_code,
+        code=code,
+        details=details,
+        request_id=request_id,
+    )
 
 
 class HttpClient:
@@ -115,7 +176,7 @@ class HttpClient:
                 time.sleep(delay)
             try:
                 response = self._client.request(method, url, **kwargs)
-                if (response.status_code in (429,) or response.status_code >= 500) and attempt < len(delays):
+                if response.status_code in _RETRYABLE_STATUSES and attempt < len(delays):
                     last_exc = response
                     continue
                 _raise_for_response(response)

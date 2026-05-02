@@ -30,7 +30,8 @@ class Collection:
         """
         Upsert records into the collection.
         Each vector dict: {"id": str, "values": list[float], "metadata": dict (optional), "text": str (optional)}
-        Note: "sparseValues" key is accepted and silently ignored by the server.
+        Note: "sparseValues" is rejected by the server with 400 SPARSE_NOT_SUPPORTED
+        (raises SparseNotSupportedError on this client).
         """
         response = self._http.post(
             f"{self._base}/records/upsert",
