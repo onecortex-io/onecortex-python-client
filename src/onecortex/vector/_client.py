@@ -52,13 +52,29 @@ class VectorClient:
         name: str,
         deletion_protected: bool | None = None,
         tags: dict | None = None,
-        **kwargs: Any,
+        bm25_enabled: bool | None = None,
     ) -> CollectionDescription:
+        """
+        Patch a collection's configuration. Pass at least one of
+        ``deletion_protected``, ``tags``, or ``bm25_enabled``.
+
+        Toggling ``bm25_enabled`` triggers an asynchronous BM25 index
+        build (or drop) on the server; the response returns immediately
+        and the index is ready a moment later. If you intend to issue a
+        hybrid query right after enabling BM25, allow a brief delay.
+        """
         body: dict = {}
         if deletion_protected is not None:
             body["deletionProtected"] = deletion_protected
         if tags is not None:
             body["tags"] = tags
+        if bm25_enabled is not None:
+            body["bm25Enabled"] = bm25_enabled
+        if not body:
+            raise ValueError(
+                "configure_collection requires at least one of "
+                "deletion_protected, tags, bm25_enabled"
+            )
         response = self._http.patch(f"{self._base_path}/collections/{name}", json=body)
         return CollectionDescription.model_validate(response.json())
 

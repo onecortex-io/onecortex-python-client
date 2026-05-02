@@ -93,6 +93,36 @@ def test_configure_collection():
 
 
 @respx.mock
+def test_configure_collection_forwards_bm25_enabled():
+    """Regression: bm25_enabled was silently swallowed by **kwargs."""
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json={**COLLECTION_RESPONSE, "bm25Enabled": True})
+
+    respx.patch(f"{BASE}{VP}/collections/test-col").mock(side_effect=_capture)
+    pc = Onecortex(url=BASE)
+    result = pc.vector.configure_collection("test-col", bm25_enabled=True)
+    body = captured["body"]
+    assert '"bm25Enabled": true' in body or '"bm25Enabled":true' in body
+    assert result.bm25_enabled is True
+
+
+def test_configure_collection_requires_at_least_one_field():
+    pc = Onecortex(url=BASE)
+    with pytest.raises(ValueError, match="at least one"):
+        pc.vector.configure_collection("test-col")
+
+
+def test_configure_collection_rejects_unknown_kwargs():
+    """Removing **kwargs means typos must fail loudly."""
+    pc = Onecortex(url=BASE)
+    with pytest.raises(TypeError):
+        pc.vector.configure_collection("test-col", bm25=True)  # type: ignore[call-arg]
+
+
+@respx.mock
 def test_not_found_raises():
     respx.get(f"{BASE}{VP}/collections/missing").mock(
         return_value=httpx.Response(404, json={"error": {"code": "NOT_FOUND", "message": "not found"}})
