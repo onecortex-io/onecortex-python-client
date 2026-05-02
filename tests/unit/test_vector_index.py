@@ -91,6 +91,58 @@ def test_fetch():
 
 
 @respx.mock
+def test_fetch_by_metadata_forwards_filter_verbatim():
+    """SDK is a thin pass-through; backend owns the filter DSL."""
+    captured = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=FETCH_RESPONSE)
+
+    respx.post(f"{COL_BASE}/records/fetch_by_metadata").mock(side_effect=_capture)
+    col = make_collection()
+    col.fetch_by_metadata(
+        filter={
+            "source": {"$eq": "blog"},
+            "year": {"$eq": 2025},
+            "authors": {"$contains": "Cortex Team"},
+        }
+    )
+    body = captured["body"]
+    assert '"$contains": "Cortex Team"' in body or '"$contains":"Cortex Team"' in body
+
+
+@respx.mock
+def test_fetch_by_metadata_contains_any():
+    captured = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=FETCH_RESPONSE)
+
+    respx.post(f"{COL_BASE}/records/fetch_by_metadata").mock(side_effect=_capture)
+    col = make_collection()
+    col.fetch_by_metadata(filter={"authors": {"$containsAny": ["Cortex Team", "Lewis"]}})
+    body = captured["body"]
+    assert "$containsAny" in body and "Cortex Team" in body and "Lewis" in body
+
+
+@respx.mock
+def test_fetch_by_metadata_contains_all():
+    captured = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=FETCH_RESPONSE)
+
+    respx.post(f"{COL_BASE}/records/fetch_by_metadata").mock(side_effect=_capture)
+    col = make_collection()
+    col.fetch_by_metadata(filter={"authors": {"$containsAll": ["Smith", "Johnson"]}})
+    body = captured["body"]
+    assert "$containsAll" in body and "Smith" in body and "Johnson" in body
+
+
+@respx.mock
 def test_delete_by_ids():
     respx.post(f"{COL_BASE}/records/delete").mock(return_value=httpx.Response(200, json={}))
     col = make_collection()

@@ -76,7 +76,28 @@ class Collection:
         include_values: bool = False,
         include_metadata: bool = True,
     ) -> FetchResult:
-        """Fetch records matching a metadata filter (Onecortex extension)."""
+        """
+        Fetch records matching a metadata filter (Onecortex extension).
+
+        Filter operators (MongoDB-style):
+
+        - Comparison: ``$eq``, ``$ne``, ``$gt``, ``$gte``, ``$lt``, ``$lte``
+        - Set membership (scalar fields): ``$in``, ``$nin``
+        - Boolean composition: ``$and``, ``$or``
+        - Array of objects: ``$elemMatch``
+        - Array of scalars: ``$contains`` (scalar), ``$containsAny`` (list, OR),
+          ``$containsAll`` (list, AND) — for fields like ``tags``, ``authors``,
+          ``categories``. Use ``$elemMatch`` instead for arrays of objects.
+        - Geo: ``$geoRadius``, ``$geoBBox``
+
+        Example::
+
+            col.fetch_by_metadata(filter={
+                "source":  {"$eq": "blog"},
+                "year":    {"$eq": 2025},
+                "authors": {"$contains": "Cortex Team"},
+            })
+        """
         response = self._http.post(
             f"{self._base}/records/fetch_by_metadata",
             json={
