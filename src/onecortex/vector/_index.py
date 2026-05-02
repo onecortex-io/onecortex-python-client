@@ -149,7 +149,7 @@ class Collection:
 
     def query(
         self,
-        vector: list[float],
+        vector: list[float] | None = None,
         top_k: int = 10,
         namespace: str = "",
         filter: dict | None = None,
@@ -163,8 +163,12 @@ class Collection:
         """
         Search for similar records using dense ANN.
 
+        Provide exactly one of ``vector`` or ``id``. When ``id`` is given,
+        the server uses the stored vector for that record as the query.
+
         Args:
-            vector: Query vector (must match collection dimension).
+            vector: Query vector (must match collection dimension). Omit
+                when querying by ``id``.
             top_k: Number of results (max 10 000).
             filter: Metadata filter using the same DSL as fetch_by_metadata().
             id: Query by record ID instead of a raw vector.
@@ -180,6 +184,10 @@ class Collection:
                 groupSize (int, optional): Max matches per group.
                 When set, returns GroupedQueryResult instead of QueryResult.
         """
+        if id is None and vector is None:
+            raise ValueError("query() requires either vector or id")
+        if id is not None and vector is not None:
+            raise ValueError("query() takes vector or id, not both")
         body: dict = {
             "topK": top_k,
             "namespace": namespace,

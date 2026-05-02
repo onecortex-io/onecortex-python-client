@@ -76,10 +76,32 @@ def test_query():
 
 @respx.mock
 def test_query_by_id():
-    respx.post(f"{COL_BASE}/query").mock(return_value=httpx.Response(200, json=QUERY_RESPONSE))
+    captured = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=QUERY_RESPONSE)
+
+    respx.post(f"{COL_BASE}/query").mock(side_effect=_capture)
     col = make_collection()
-    result = col.query(vector=[], id="v1", top_k=1)
+    # vector must be omittable when id is provided
+    result = col.query(id="v1", top_k=1)
     assert result.matches[0].id == "v1"
+    body = captured["body"]
+    assert '"id": "v1"' in body or '"id":"v1"' in body
+    assert "vector" not in body
+
+
+def test_query_requires_vector_or_id():
+    col = make_collection()
+    with pytest.raises(ValueError, match="vector or id"):
+        col.query(top_k=1)
+
+
+def test_query_rejects_both_vector_and_id():
+    col = make_collection()
+    with pytest.raises(ValueError, match="not both"):
+        col.query(vector=[1.0, 0.0, 0.0], id="v1", top_k=1)
 
 
 @respx.mock
