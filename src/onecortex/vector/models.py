@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -6,6 +6,36 @@ from pydantic import BaseModel, ConfigDict, Field
 class CollectionStatus(BaseModel):
     ready: bool
     state: str
+
+
+class EmbedderSpec(BaseModel):
+    """Per-collection server-side embedder binding.
+
+    When a collection is created with an EmbedderSpec, callers may send
+    ``text`` instead of ``values`` on upsert and query, and the server will
+    embed it using the bound backend.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    backend: Literal["openai", "voyage", "cohere", "jina", "tei"]
+    model: str
+    input_type: Literal["document", "query"] | None = Field(alias="inputType", default=None)
+
+
+class HybridSpec(BaseModel):
+    """Custom fusion parameters for the ``hybrid`` field on /search."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    alpha: float | None = None
+    bm25_weight: float | None = Field(alias="bm25Weight", default=None)
+
+
+class DedupSpec(BaseModel):
+    """First-occurrence-wins dedup by a metadata field."""
+
+    by: str
 
 
 class CollectionDescription(BaseModel):
@@ -21,6 +51,7 @@ class CollectionDescription(BaseModel):
     bm25_enabled: bool = Field(alias="bm25Enabled", default=False)
     deletion_protected: bool | None = Field(alias="deletionProtected", default=None)
     tags: dict | None = None
+    embedder: EmbedderSpec | None = None
 
 
 class Match(BaseModel):

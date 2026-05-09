@@ -10,6 +10,11 @@ from onecortex import (
     CollectionAlreadyExistsError,
     CollectionNotFoundError,
     DimensionMismatchError,
+    EmbedderConfigError,
+    EmbedderDimensionMismatchError,
+    EmbedderRateLimitedError,
+    EmbedderTimeoutError,
+    EmbedderUpstreamError,
     FacetFieldInvalidError,
     FilterMalformedError,
     FilterUnsupportedOperatorError,
@@ -23,6 +28,8 @@ from onecortex import (
     RerankerTimeoutError,
     RerankerUpstreamError,
     SparseNotSupportedError,
+    TextRequiredError,
+    ValuesAndTextConflictError,
 )
 
 BASE = "http://test-server:8080"
@@ -135,6 +142,49 @@ TYPED_CASES = [
         504,
         RerankerTimeoutError,
         {"kind": "timeout"},
+    ),
+    # v0.3.0 server-side embedder codes
+    (
+        "EMBEDDER_CONFIG",
+        400,
+        EmbedderConfigError,
+        {"backend": "openai"},
+    ),
+    (
+        "EMBEDDER_UPSTREAM",
+        502,
+        EmbedderUpstreamError,
+        {"backend": "voyage", "upstreamStatus": 500},
+    ),
+    (
+        "EMBEDDER_RATE_LIMITED",
+        429,
+        EmbedderRateLimitedError,
+        {"backend": "openai"},
+    ),
+    (
+        "EMBEDDER_TIMEOUT",
+        504,
+        EmbedderTimeoutError,
+        {"backend": "cohere"},
+    ),
+    (
+        "EMBEDDER_DIMENSION_MISMATCH",
+        400,
+        EmbedderDimensionMismatchError,
+        {"expected": 1536, "got": 768},
+    ),
+    (
+        "TEXT_REQUIRED",
+        400,
+        TextRequiredError,
+        {"recordId": "r1"},
+    ),
+    (
+        "VALUES_AND_TEXT_CONFLICT",
+        400,
+        ValuesAndTextConflictError,
+        {"recordId": "r1"},
     ),
 ]
 

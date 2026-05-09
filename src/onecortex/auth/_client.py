@@ -36,6 +36,7 @@ class AuthClient:
         """Exchange the current refresh token for a new session."""
         if not self._http._refresh_token:
             from ..exceptions import UnauthorizedError
+
             raise UnauthorizedError("No refresh token available. Call login() first.")
         body = {"grant_type": "refresh_token", "refresh_token": self._http._refresh_token}
         response = self._http.post(f"{self._base_path}/token", json=body)

@@ -101,3 +101,34 @@ class RerankerConfigError(OnecortexServerError):
 
 class RerankerTimeoutError(OnecortexServerError):
     """Reranker upstream timed out — retryable with caution."""
+
+
+# --- v0.3.0 server-side embedder error subclasses ---
+
+
+class EmbedderConfigError(OnecortexServerError):
+    """Embedder is misconfigured (e.g., missing API key for the bound backend)."""
+
+
+class EmbedderUpstreamError(OnecortexServerError):
+    """Embedder upstream returned a non-2xx, failed to connect, or response was unparseable."""
+
+
+class EmbedderRateLimitedError(OnecortexServerError):
+    """Embedder upstream returned 429 — retryable with backoff."""
+
+
+class EmbedderTimeoutError(OnecortexServerError):
+    """Embedder upstream timed out — retryable with caution."""
+
+
+class EmbedderDimensionMismatchError(InvalidArgumentError):
+    """Embedder's output dimension does not match the collection's declared dimension."""
+
+
+class TextRequiredError(InvalidArgumentError):
+    """A record/query needs a vector input but the collection has an embedder bound and no text was provided."""
+
+
+class ValuesAndTextConflictError(InvalidArgumentError):
+    """Both ``values`` and ``text`` were provided on a record/query bound to an embedder."""

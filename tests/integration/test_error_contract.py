@@ -99,16 +99,26 @@ def test_collection_already_exists(oc_client, fresh_collection):
     assert err.details.get("collection") == fresh_collection
 
 
-def test_hybrid_requires_bm25(oc_client, fresh_collection):
-    """A non-BM25 cosine collection cannot serve a hybrid query."""
-    col = oc_client.vector.collection(fresh_collection)
-    col.upsert([{"id": "r1", "values": [1.0, 0.0, 0.0], "text": "hello"}])
-    with pytest.raises(HybridRequiresBm25Error) as exc_info:
-        col.query_hybrid(vector=[1.0, 0.0, 0.0], text="hello", top_k=1)
-    err = exc_info.value
-    assert err.status_code == 400
-    assert err.code == "HYBRID_REQUIRES_BM25"
-    assert err.details.get("collection") == fresh_collection
+def test_hybrid_requires_bm25(oc_client):
+    """A non-BM25 cosine collection cannot serve a hybrid query.
+
+    Since onecortex-vector v0.3 the server defaults bm25Enabled to true on
+    new collections, so this test must opt out explicitly.
+    """
+    name = _name("err-int-nobm25")
+    oc_client.vector.create_collection(name=name, dimension=DIM, metric="cosine", bm25_enabled=False)
+    try:
+        col = oc_client.vector.collection(name)
+        col.upsert([{"id": "r1", "values": [1.0, 0.0, 0.0], "text": "hello"}])
+        with pytest.raises(HybridRequiresBm25Error) as exc_info:
+            col.query_hybrid(vector=[1.0, 0.0, 0.0], text="hello", top_k=1)
+        err = exc_info.value
+        assert err.status_code == 400
+        assert err.code == "HYBRID_REQUIRES_BM25"
+        assert err.details.get("collection") == name
+    finally:
+        with contextlib.suppress(Exception):
+            oc_client.vector.delete_collection(name)
 
 
 def test_group_by_field_missing(oc_client, fresh_collection):

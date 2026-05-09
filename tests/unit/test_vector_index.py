@@ -1,8 +1,10 @@
+import json
+
 import httpx
 import pytest
 import respx
 
-from onecortex import Onecortex
+from onecortex import GroupedQueryResult, Onecortex
 
 BASE = "http://test-server:8080"
 VP = "/vector/v1"
@@ -94,13 +96,13 @@ def test_query_by_id():
 
 def test_query_requires_vector_or_id():
     col = make_collection()
-    with pytest.raises(ValueError, match="vector or id"):
+    with pytest.raises(ValueError, match="vector, id, or text"):
         col.query(top_k=1)
 
 
 def test_query_rejects_both_vector_and_id():
     col = make_collection()
-    with pytest.raises(ValueError, match="not both"):
+    with pytest.raises(ValueError, match="exactly one"):
         col.query(vector=[1.0, 0.0, 0.0], id="v1", top_k=1)
 
 
@@ -472,3 +474,171 @@ def test_facet_counts_429_retry():
     col = make_collection()
     result = col.facet_counts("category")
     assert result.facets[0].value == "electronics"
+
+
+# ── /search and server-side embedder tests ──────────────────────────────────
+
+
+GROUPED_RESPONSE = {
+    "namespace": "",
+    "grouped": True,
+    "groups": [
+        {"key": "blog", "matches": [{"id": "v1", "score": 0.9}]},
+        {"key": "docs", "matches": [{"id": "v2", "score": 0.8}]},
+    ],
+}
+
+EXPLAIN_RESPONSE = {
+    "plan": {
+        "source": {"kind": "dense", "vector": [1.0, 0.0, 0.0]},
+        "namespace": "",
+        "topK": 5,
+        "stages": [{"kind": "truncate", "k": 5}],
+        "output": {"includeValues": False, "includeMetadata": False},
+    }
+}
+
+
+@respx.mock
+def test_query_with_text_sends_text_field():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["url"] = str(request.url)
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=QUERY_RESPONSE)
+
+    respx.post(f"{COL_BASE}/query").mock(side_effect=_capture)
+    col = make_collection()
+    col.query(text="hello", top_k=3)
+    body = json.loads(captured["body"])
+    assert body["text"] == "hello"
+    assert "vector" not in body
+    assert "noCache" not in captured["url"]
+
+
+@respx.mock
+def test_query_no_cache_appends_query_string():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json=QUERY_RESPONSE)
+
+    respx.post(url__regex=rf"{COL_BASE}/query.*").mock(side_effect=_capture)
+    col = make_collection()
+    col.query(text="hello", top_k=3, no_cache=True)
+    assert "noCache=true" in captured["url"]
+
+
+def test_query_rejects_text_with_vector():
+    col = make_collection()
+    with pytest.raises(ValueError, match="exactly one"):
+        col.query(vector=[1.0, 0.0, 0.0], text="hi", top_k=1)
+
+
+@respx.mock
+def test_search_flat():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["url"] = str(request.url)
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=QUERY_RESPONSE)
+
+    respx.post(url__regex=rf"{COL_BASE}/search.*").mock(side_effect=_capture)
+    col = make_collection()
+    result = col.search(text="hello", top_k=5)
+    assert result.matches[0].id == "v1"
+    body = json.loads(captured["body"])
+    assert body["text"] == "hello"
+    assert body["topK"] == 5
+    assert captured["url"].endswith("/search")
+
+
+@respx.mock
+def test_search_with_hybrid_dict_and_dedup():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=QUERY_RESPONSE)
+
+    respx.post(url__regex=rf"{COL_BASE}/search.*").mock(side_effect=_capture)
+    col = make_collection()
+    col.search(
+        text="hi",
+        top_k=10,
+        hybrid={"alpha": 0.4, "bm25Weight": 0.6},
+        dedup={"by": "docId"},
+        rerank={"query": "greeting"},
+        score_threshold=0.5,
+    )
+    body = json.loads(captured["body"])
+    assert body["hybrid"] == {"alpha": 0.4, "bm25Weight": 0.6}
+    assert body["dedup"] == {"by": "docId"}
+    assert body["rerank"] == {"query": "greeting"}
+    assert body["scoreThreshold"] == 0.5
+
+
+@respx.mock
+def test_search_with_group_by_returns_grouped():
+    respx.post(url__regex=rf"{COL_BASE}/search.*").mock(return_value=httpx.Response(200, json=GROUPED_RESPONSE))
+    col = make_collection()
+    result = col.search(text="hi", top_k=3, group_by={"field": "source", "limit": 2, "groupSize": 1})
+    assert isinstance(result, GroupedQueryResult)
+    assert len(result.groups) == 2
+    assert result.groups[0].key == "blog"
+
+
+@respx.mock
+def test_search_explain_returns_plan_dict():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json=EXPLAIN_RESPONSE)
+
+    respx.post(url__regex=rf"{COL_BASE}/search.*").mock(side_effect=_capture)
+    col = make_collection()
+    result = col.search(vector=[1.0, 0.0, 0.0], top_k=5, explain=True)
+    assert "explain=true" in captured["url"]
+    assert isinstance(result, dict)
+    assert result["plan"]["source"]["kind"] == "dense"
+
+
+@respx.mock
+def test_search_no_cache_query_string():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["url"] = str(request.url)
+        return httpx.Response(200, json=QUERY_RESPONSE)
+
+    respx.post(url__regex=rf"{COL_BASE}/search.*").mock(side_effect=_capture)
+    col = make_collection()
+    col.search(text="hi", top_k=3, no_cache=True, explain=True)
+    assert "noCache=true" in captured["url"]
+    assert "explain=true" in captured["url"]
+
+
+def test_search_requires_one_input():
+    col = make_collection()
+    with pytest.raises(ValueError, match="vector, id, or text"):
+        col.search(top_k=1)
+
+
+@respx.mock
+def test_upsert_with_text_field():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=UPSERT_RESPONSE)
+
+    respx.post(f"{COL_BASE}/records/upsert").mock(side_effect=_capture)
+    col = make_collection()
+    col.upsert(vectors=[{"id": "v1", "text": "hello world"}])
+    body = json.loads(captured["body"])
+    assert body["records"][0]["text"] == "hello world"
+    assert "values" not in body["records"][0]

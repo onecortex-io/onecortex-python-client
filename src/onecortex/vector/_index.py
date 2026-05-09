@@ -1,11 +1,15 @@
+from typing import Any
+
 from .._http import HttpClient
 from .models import (
     BatchQueryResult,
     CollectionStats,
+    DedupSpec,
     FacetResult,
     FetchResult,
     GroupedMatch,
     GroupedQueryResult,
+    HybridSpec,
     ListResult,
     QueryResult,
     RecommendResult,
@@ -159,6 +163,8 @@ class Collection:
         rerank: dict | None = None,
         score_threshold: float | None = None,
         group_by: dict | None = None,
+        text: str | None = None,
+        no_cache: bool = False,
     ) -> QueryResult | GroupedQueryResult:
         """
         Search for similar records using dense ANN.
@@ -184,10 +190,11 @@ class Collection:
                 groupSize (int, optional): Max matches per group.
                 When set, returns GroupedQueryResult instead of QueryResult.
         """
-        if id is None and vector is None:
-            raise ValueError("query() requires either vector or id")
-        if id is not None and vector is not None:
-            raise ValueError("query() takes vector or id, not both")
+        sources = sum(1 for s in (vector, id, text) if s is not None)
+        if sources == 0:
+            raise ValueError("query() requires one of vector, id, or text")
+        if sources > 1:
+            raise ValueError("query() takes exactly one of vector, id, or text")
         body: dict = {
             "topK": top_k,
             "namespace": namespace,
@@ -196,6 +203,8 @@ class Collection:
         }
         if id is not None:
             body["id"] = id
+        elif text is not None:
+            body["text"] = text
         else:
             body["vector"] = vector
         if filter is not None:
@@ -208,7 +217,10 @@ class Collection:
             body["groupBy"] = group_by
             body["includeMetadata"] = True  # server requires metadata to resolve group field
 
-        response = self._http.post(f"{self._base}/query", json=body)
+        path = f"{self._base}/query"
+        if no_cache:
+            path = f"{path}?noCache=true"
+        response = self._http.post(path, json=body)
         data = response.json()
 
         if group_by is not None:
@@ -264,6 +276,97 @@ class Collection:
             body["scoreThreshold"] = score_threshold
         response = self._http.post(f"{self._base}/query/hybrid", json=body)
         return QueryResult.model_validate(response.json())
+
+    def search(
+        self,
+        *,
+        vector: list[float] | None = None,
+        id: str | None = None,
+        text: str | None = None,
+        top_k: int = 10,
+        namespace: str = "",
+        filter: dict | None = None,
+        hybrid: bool | dict | HybridSpec | None = None,
+        rerank: dict | None = None,
+        score_threshold: float | None = None,
+        dedup: dict | DedupSpec | None = None,
+        group_by: dict | None = None,
+        include_values: bool = False,
+        include_metadata: bool = False,
+        no_cache: bool = False,
+        explain: bool = False,
+    ) -> QueryResult | GroupedQueryResult | dict[str, Any]:
+        """Unified retrieval endpoint.
+
+        Posts to ``/v1/collections/{name}/search``. Mode is auto-detected:
+        when ``text`` is provided on a bm25-enabled collection, the server
+        runs hybrid; otherwise dense. Force the mode via ``hybrid=True``,
+        ``hybrid=False``, or ``hybrid={"alpha": 0.5, "bm25Weight": 0.5}``.
+
+        Post-processing stages run server-side in order: ``rerank`` →
+        ``score_threshold`` → ``dedup`` → ``group_by`` → implicit truncate.
+
+        With ``explain=True`` the server returns ``{"plan": {...}}`` without
+        executing the query; this method returns that dict as-is.
+        """
+        sources = sum(1 for s in (vector, id, text) if s is not None)
+        if sources == 0:
+            raise ValueError("search() requires one of vector, id, or text")
+        if sources > 1:
+            raise ValueError("search() takes exactly one of vector, id, or text")
+
+        body: dict[str, Any] = {
+            "topK": top_k,
+            "namespace": namespace,
+            "includeValues": include_values,
+            "includeMetadata": include_metadata,
+        }
+        if vector is not None:
+            body["vector"] = vector
+        if id is not None:
+            body["id"] = id
+        if text is not None:
+            body["text"] = text
+        if filter is not None:
+            body["filter"] = filter
+        if hybrid is not None:
+            if isinstance(hybrid, HybridSpec):
+                body["hybrid"] = hybrid.model_dump(by_alias=True, exclude_none=True)
+            else:
+                body["hybrid"] = hybrid
+        if rerank is not None:
+            body["rerank"] = rerank
+        if score_threshold is not None:
+            body["scoreThreshold"] = score_threshold
+        if dedup is not None:
+            body["dedup"] = (
+                dedup.model_dump(by_alias=True, exclude_none=True) if isinstance(dedup, DedupSpec) else dedup
+            )
+        if group_by is not None:
+            body["groupBy"] = group_by
+            body["includeMetadata"] = True
+
+        params: list[str] = []
+        if no_cache:
+            params.append("noCache=true")
+        if explain:
+            params.append("explain=true")
+        path = f"{self._base}/search"
+        if params:
+            path = f"{path}?{'&'.join(params)}"
+
+        response = self._http.post(path, json=body)
+        data: dict[str, Any] = response.json()
+
+        if explain:
+            return data
+        if group_by is not None:
+            raw_groups = data.get("groups", [])
+            return GroupedQueryResult(
+                groups=[GroupedMatch(**g) for g in raw_groups],
+                namespace=data.get("namespace", ""),
+            )
+        return QueryResult.model_validate(data)
 
     def scroll(
         self,

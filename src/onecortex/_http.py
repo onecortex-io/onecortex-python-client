@@ -8,6 +8,11 @@ from .exceptions import (
     CollectionAlreadyExistsError,
     CollectionNotFoundError,
     DimensionMismatchError,
+    EmbedderConfigError,
+    EmbedderDimensionMismatchError,
+    EmbedderRateLimitedError,
+    EmbedderTimeoutError,
+    EmbedderUpstreamError,
     FacetFieldInvalidError,
     FilterMalformedError,
     FilterUnsupportedOperatorError,
@@ -23,7 +28,9 @@ from .exceptions import (
     RerankerTimeoutError,
     RerankerUpstreamError,
     SparseNotSupportedError,
+    TextRequiredError,
     UnauthorizedError,
+    ValuesAndTextConflictError,
 )
 
 _ERROR_MAP = {
@@ -47,6 +54,14 @@ _ERROR_MAP = {
     "RERANKER_TIMEOUT": RerankerTimeoutError,
     "RERANKER_CONFIG": RerankerConfigError,
     "RERANKER_UPSTREAM": RerankerUpstreamError,
+    # v0.3.0 server-side embedder codes
+    "EMBEDDER_CONFIG": EmbedderConfigError,
+    "EMBEDDER_UPSTREAM": EmbedderUpstreamError,
+    "EMBEDDER_RATE_LIMITED": EmbedderRateLimitedError,
+    "EMBEDDER_TIMEOUT": EmbedderTimeoutError,
+    "EMBEDDER_DIMENSION_MISMATCH": EmbedderDimensionMismatchError,
+    "TEXT_REQUIRED": TextRequiredError,
+    "VALUES_AND_TEXT_CONFLICT": ValuesAndTextConflictError,
 }
 
 # HTTP statuses that should trigger a retry on a transient failure.

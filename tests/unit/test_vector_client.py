@@ -1,8 +1,10 @@
+import json
+
 import httpx
 import pytest
 import respx
 
-from onecortex import Onecortex
+from onecortex import EmbedderSpec, Onecortex
 from onecortex.exceptions import NotFoundError
 
 BASE = "http://test-server:8080"
@@ -144,9 +146,99 @@ ALIAS_LIST_RESPONSE = {
 
 
 @respx.mock
-def test_create_alias():
-    import json
+def test_create_collection_with_embedder_dict():
+    captured: dict[str, str] = {}
 
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(
+            200,
+            json={
+                **COLLECTION_RESPONSE,
+                "embedder": {
+                    "backend": "openai",
+                    "model": "text-embedding-3-small",
+                    "inputType": "document",
+                },
+            },
+        )
+
+    respx.post(f"{BASE}{VP}/collections").mock(side_effect=_capture)
+    pc = Onecortex(url=BASE)
+    col = pc.vector.create_collection(
+        name="test-col",
+        dimension=3,
+        embedder={
+            "backend": "openai",
+            "model": "text-embedding-3-small",
+            "inputType": "document",
+        },
+    )
+    body = json.loads(captured["body"])
+    assert body["embedder"] == {
+        "backend": "openai",
+        "model": "text-embedding-3-small",
+        "inputType": "document",
+    }
+    assert col.embedder is not None
+    assert col.embedder.backend == "openai"
+    assert col.embedder.input_type == "document"
+
+
+@respx.mock
+def test_create_collection_with_embedder_spec_omits_none_alias():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=COLLECTION_RESPONSE)
+
+    respx.post(f"{BASE}{VP}/collections").mock(side_effect=_capture)
+    pc = Onecortex(url=BASE)
+    pc.vector.create_collection(
+        name="test-col",
+        dimension=3,
+        embedder=EmbedderSpec(backend="voyage", model="voyage-3"),
+    )
+    body = json.loads(captured["body"])
+    assert body["embedder"] == {"backend": "voyage", "model": "voyage-3"}
+    assert "inputType" not in body["embedder"]
+
+
+@respx.mock
+def test_create_collection_bm25_default_omitted_when_unset():
+    """When bm25_enabled is not specified, the SDK does not send the field
+    so the server-side default (true since v0.3) takes effect."""
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=COLLECTION_RESPONSE)
+
+    respx.post(f"{BASE}{VP}/collections").mock(side_effect=_capture)
+    pc = Onecortex(url=BASE)
+    pc.vector.create_collection(name="test-col", dimension=3)
+    body = json.loads(captured["body"])
+    assert "bm25Enabled" not in body
+
+
+@respx.mock
+def test_create_collection_bm25_explicit_false_is_sent():
+    captured: dict[str, str] = {}
+
+    def _capture(request: httpx.Request):
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json=COLLECTION_RESPONSE)
+
+    respx.post(f"{BASE}{VP}/collections").mock(side_effect=_capture)
+    pc = Onecortex(url=BASE)
+    pc.vector.create_collection(name="test-col", dimension=3, bm25_enabled=False)
+    body = json.loads(captured["body"])
+    assert body["bm25Enabled"] is False
+
+
+@respx.mock
+def test_create_alias():
     route = respx.post(f"{BASE}{VP}/aliases").mock(return_value=httpx.Response(201, json=ALIAS_RESPONSE))
     pc = Onecortex(url=BASE)
     result = pc.vector.create_alias(alias="prod", collection_name="my-col-v2")
