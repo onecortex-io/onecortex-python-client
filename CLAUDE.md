@@ -15,6 +15,24 @@ uv run mypy src/onecortex/                 # Type check
 uv build                                   # Build package
 ```
 
+## Git Hooks (lefthook)
+
+One-time setup: `lefthook install`
+
+Pre-commit (fast):
+- `uv run ruff format --check src/ tests/`
+- `uv run ruff check src/ tests/`
+- `uv run mypy src/onecortex/`
+- `uv run pytest tests/unit/ -v`
+- `gitleaks protect --staged --verbose`
+
+Pre-push:
+- `uv run pytest tests/integration/ -v`
+- `uv build`
+
+Bypass a single hook: `SKIP=hookname git commit --no-verify`  
+Skip the entire suite: `LEFTHOOK=0 git commit`
+
 ## Architecture
 
 ```

@@ -1,5 +1,7 @@
 Run the test suite for the onecortex SDK.
 
+> **Note:** Lefthook pre-commit already runs `uv run pytest tests/unit/ -v` automatically, and pre-push runs `uv run pytest tests/integration/ -v`. Use this command when you want to run a **specific** test, get detailed failure diagnosis, or explicitly request integration tests.
+
 ## Default: Unit Tests
 
 Run unit tests (no server required):
