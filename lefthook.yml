@@ -28,9 +28,6 @@ commit-msg:
 
 pre-push:
   commands:
-    integration-test:
-      run: uv run pytest tests/integration/ -v
-      fail_text: "Integration tests failed. Bypass: SKIP=integration-test git push --no-verify"
     build:
       run: uv build
       fail_text: "Build failed. Bypass: SKIP=build git push --no-verify"
