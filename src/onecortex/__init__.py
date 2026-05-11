@@ -51,9 +51,11 @@ from .vector import (
     NamespaceSummary,
     QueryResult,
     RecommendResult,
+    ReindexResult,
     ScrollResult,
     ScrollVector,
     UpsertResult,
+    VacuumResult,
     VectorClient,
 )
 
@@ -102,6 +104,7 @@ __all__ = [
     "PermissionDeniedError",
     "QueryResult",
     "RecommendResult",
+    "ReindexResult",
     "RerankerConfigError",
     "RerankerRateLimitedError",
     "RerankerTimeoutError",
@@ -112,6 +115,7 @@ __all__ = [
     "TextRequiredError",
     "UnauthorizedError",
     "UpsertResult",
+    "VacuumResult",
     "ValuesAndTextConflictError",
     "VectorClient",
 ]

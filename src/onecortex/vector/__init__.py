@@ -20,9 +20,11 @@ from .models import (
     NamespaceSummary,
     QueryResult,
     RecommendResult,
+    ReindexResult,
     ScrollResult,
     ScrollVector,
     UpsertResult,
+    VacuumResult,
 )
 
 __all__ = [
@@ -46,8 +48,10 @@ __all__ = [
     "NamespaceSummary",
     "QueryResult",
     "RecommendResult",
+    "ReindexResult",
     "ScrollResult",
     "ScrollVector",
     "UpsertResult",
+    "VacuumResult",
     "VectorClient",
 ]

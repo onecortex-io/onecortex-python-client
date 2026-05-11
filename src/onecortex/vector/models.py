@@ -54,6 +54,17 @@ class CollectionDescription(BaseModel):
     embedder: EmbedderSpec | None = None
 
 
+class VacuumResult(BaseModel):
+    collection: str
+    status: str
+
+
+class ReindexResult(BaseModel):
+    collection: str
+    status: str
+    message: str
+
+
 class Match(BaseModel):
     id: str
     score: float

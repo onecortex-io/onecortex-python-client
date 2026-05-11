@@ -7,6 +7,8 @@ from .models import (
     AliasListResult,
     CollectionDescription,
     EmbedderSpec,
+    ReindexResult,
+    VacuumResult,
 )
 
 
@@ -105,6 +107,43 @@ class VectorClient:
     def collection(self, name: str) -> Collection:
         """Get a handle to a specific collection for data-plane operations."""
         return Collection(http=self._http, base_path=self._base_path, name=name)
+
+    def vacuum_collection(self, name: str) -> VacuumResult:
+        """Run VACUUM ANALYZE on a collection table.
+
+        Reclaims storage from deleted records and refreshes PostgreSQL planner
+        statistics. Synchronous — returns when the operation completes.
+
+        Args:
+            name: Collection name or alias.
+
+        Returns:
+            VacuumResult with ``collection`` and ``status="ok"``.
+
+        Raises:
+            CollectionNotFoundError: If the collection does not exist.
+        """
+        response = self._http.post(f"{self._base_path}/collections/{name}/vacuum")
+        return VacuumResult.model_validate(response.json())
+
+    def reindex_collection(self, name: str) -> ReindexResult:
+        """Rebuild the DiskANN vector index for a collection in the background.
+
+        Drops and recreates the StreamingDiskANN index using CREATE INDEX
+        CONCURRENTLY so reads are not blocked. Returns immediately;
+        the rebuild continues in the background.
+
+        Args:
+            name: Collection name or alias.
+
+        Returns:
+            ReindexResult with ``collection``, ``status="reindexing"``, and ``message``.
+
+        Raises:
+            CollectionNotFoundError: If the collection does not exist.
+        """
+        response = self._http.post(f"{self._base_path}/collections/{name}/reindex")
+        return ReindexResult.model_validate(response.json())
 
     # ── Aliases ──────────────────────────────────────────────────────────────
 

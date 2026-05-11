@@ -361,3 +361,84 @@ def test_alias_lifecycle(oc_client):
     # After deletion, describe should raise NotFoundError
     with pytest.raises(NotFoundError):
         oc_client.vector.describe_alias(alias_name)
+
+
+# ── Filter operator tests ─────────────────────────────────────────────────────
+
+
+def test_in_filter(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM, metric="cosine")
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
+        vectors=[
+            {"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {"tag": "a"}},
+            {"id": "v2", "values": [0.0, 1.0, 0.0], "metadata": {"tag": "b"}},
+            {"id": "v3", "values": [0.0, 0.0, 1.0], "metadata": {"tag": "c"}},
+        ]
+    )
+    result = col.fetch_by_metadata(filter={"tag": {"$in": ["a", "b"]}})
+    ids = {r["id"] for r in result.records}
+    assert ids == {"v1", "v2"}
+
+
+def test_nin_filter(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM, metric="cosine")
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
+        vectors=[
+            {"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {"tag": "a"}},
+            {"id": "v2", "values": [0.0, 1.0, 0.0], "metadata": {"tag": "b"}},
+            {"id": "v3", "values": [0.0, 0.0, 1.0], "metadata": {"tag": "c"}},
+        ]
+    )
+    result = col.fetch_by_metadata(filter={"tag": {"$nin": ["a", "b"]}})
+    ids = {r["id"] for r in result.records}
+    assert ids == {"v3"}
+
+
+def test_exists_filter_true(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM, metric="cosine")
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
+        vectors=[
+            {"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {"source": "web"}},
+            {"id": "v2", "values": [0.0, 1.0, 0.0], "metadata": {}},
+        ]
+    )
+    result = col.fetch_by_metadata(filter={"source": {"$exists": True}})
+    ids = [r["id"] for r in result.records]
+    assert "v1" in ids
+    assert "v2" not in ids
+
+
+def test_exists_filter_false(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM, metric="cosine")
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(
+        vectors=[
+            {"id": "v1", "values": [1.0, 0.0, 0.0], "metadata": {"source": "web"}},
+            {"id": "v2", "values": [0.0, 1.0, 0.0], "metadata": {}},
+        ]
+    )
+    result = col.fetch_by_metadata(filter={"source": {"$exists": False}})
+    ids = [r["id"] for r in result.records]
+    assert "v2" in ids
+    assert "v1" not in ids
+
+
+def test_vacuum_collection(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM, metric="cosine")
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
+    result = oc_client.vector.vacuum_collection(COLLECTION_NAME)
+    assert result.status == "ok"
+    assert result.collection == COLLECTION_NAME
+
+
+def test_reindex_collection(oc_client):
+    oc_client.vector.create_collection(name=COLLECTION_NAME, dimension=DIM, metric="cosine")
+    col = oc_client.vector.collection(COLLECTION_NAME)
+    col.upsert(vectors=[{"id": "v1", "values": [1.0, 0.0, 0.0]}])
+    result = oc_client.vector.reindex_collection(COLLECTION_NAME)
+    assert result.status == "reindexing"
+    assert result.collection == COLLECTION_NAME

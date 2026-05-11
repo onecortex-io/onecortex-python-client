@@ -272,3 +272,33 @@ def test_delete_alias():
     respx.delete(f"{BASE}{VP}/aliases/prod").mock(return_value=httpx.Response(204))
     pc = Onecortex(url=BASE)
     pc.vector.delete_alias("prod")  # should not raise
+
+
+@respx.mock
+def test_vacuum_collection_posts_to_correct_url():
+    respx.post(f"{BASE}{VP}/collections/my-col/vacuum").mock(
+        return_value=httpx.Response(200, json={"collection": "my-col", "status": "ok"})
+    )
+    pc = Onecortex(url=BASE)
+    result = pc.vector.vacuum_collection("my-col")
+    assert result.collection == "my-col"
+    assert result.status == "ok"
+
+
+@respx.mock
+def test_reindex_collection_posts_to_correct_url():
+    respx.post(f"{BASE}{VP}/collections/my-col/reindex").mock(
+        return_value=httpx.Response(
+            202,
+            json={
+                "collection": "my-col",
+                "status": "reindexing",
+                "message": "DiskANN index rebuild started in background.",
+            },
+        )
+    )
+    pc = Onecortex(url=BASE)
+    result = pc.vector.reindex_collection("my-col")
+    assert result.collection == "my-col"
+    assert result.status == "reindexing"
+    assert "background" in result.message
