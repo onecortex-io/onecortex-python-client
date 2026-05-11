@@ -1,0 +1,36 @@
+pre-commit:
+  parallel: true
+  commands:
+    ruff-format:
+      run: uv run ruff format --check src/ tests/
+      fail_text: "Run 'uv run ruff format --write src/ tests/' to fix. Bypass: SKIP=ruff-format git commit --no-verify"
+    ruff-lint:
+      run: uv run ruff check src/ tests/
+      fail_text: "Fix lint errors. Bypass: SKIP=ruff-lint git commit --no-verify"
+    mypy:
+      run: uv run mypy src/onecortex/
+      fail_text: "Fix type errors. Bypass: SKIP=mypy git commit --no-verify"
+    unit-test:
+      run: uv run pytest tests/unit/ -v
+      fail_text: "Unit tests failed. Bypass: SKIP=unit-test git commit --no-verify"
+    gitleaks:
+      run: gitleaks protect --staged --verbose
+      fail_text: "Secrets detected. Bypass: SKIP=gitleaks git commit --no-verify"
+    parity-reminder:
+      run: scripts/sdk-parity-reminder.sh
+      fail_text: "Reminder only — ensure SDK parity before pushing."
+
+commit-msg:
+  commands:
+    lint:
+      run: scripts/commitlint.sh {1}
+      fail_text: "Commit must follow conventional commits. Bypass: SKIP=lint git commit --no-verify"
+
+pre-push:
+  commands:
+    integration-test:
+      run: uv run pytest tests/integration/ -v
+      fail_text: "Integration tests failed. Bypass: SKIP=integration-test git push --no-verify"
+    build:
+      run: uv build
+      fail_text: "Build failed. Bypass: SKIP=build git push --no-verify"
